@@ -1,0 +1,57 @@
+name: Build and Deploy Spring Boot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Verify Java
+        run: |
+          java -version
+          mvn -version
+
+      - name: Build Spring Boot Project
+        working-directory: backend
+        run: |
+          mvn clean package -DskipTests
+
+      - name: Verify JAR
+        run: |
+          ls -lh backend/target
+
+      - name: Stop Existing Service
+        run: |
+          sudo systemctl stop datastore || true
+
+      - name: Copy JAR
+        run: |
+          sudo mkdir -p /opt/datastore
+          sudo cp backend/target/*.jar /opt/datastore/datastore.jar
+          sudo chmod 755 /opt/datastore/datastore.jar
+
+      - name: Start Service
+        run: |
+          sudo systemctl daemon-reload
+          sudo systemctl start datastore
+          sudo systemctl enable datastore
+
+      - name: Check Service Status
+        run: |
+          sudo systemctl status datastore --no-pager
+
+      - name: Application Logs
+        run: |
+          sudo journalctl -u datastore -n 50 --no-pager
